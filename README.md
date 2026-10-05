@@ -42,3 +42,25 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Local database setup
+
+EventHub uses MySQL with Prisma ORM.
+
+Local development requires:
+
+- MySQL Server running
+- Main database: `eventhub`
+- Shadow database: `eventhub_shadow`
+- A dedicated application user with access to both databases
+
+Copy the safe variable names from `.env.example` into
+`.env.local` and provide private local credentials.
+
+Never commit `.env.local`.
+
+## Prisma commands
+
+Format the Prisma schema:
+
+```bash
+npm run prisma:format

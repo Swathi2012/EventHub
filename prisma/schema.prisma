@@ -1,0 +1,190 @@
+// Generate EventHub's type-safe Prisma Client.
+//
+// This folder is generated from the schema and must not contain
+// manually written application logic.
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+// EventHub uses MySQL as its relational database.
+//
+// DATABASE_URL is supplied through prisma7.config.ts.
+datasource db {
+  provider = "mysql"
+}
+
+// Defines what an EventHub account is allowed to do.
+enum UserRole {
+  USER
+  ORGANIZER
+  ADMIN
+}
+
+// Defines whether an account may currently use the platform.
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+// Defines the lifecycle of an organizer application/profile.
+enum OrganizerStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+// Reserved for the EventHub event lifecycle implemented later.
+enum EventStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  REJECTED
+  HIDDEN
+  CANCELLED
+  COMPLETED
+  ARCHIVED
+}
+
+// Defines how attendees participate in an event.
+enum EventFormat {
+  PHYSICAL
+  ONLINE
+  HYBRID
+}
+
+// Central EventHub user identity.
+//
+// Story 1.2 creates database storage only.
+// Registration and password hashing belong to Story 2.1.
+model User {
+  id              String        @id @default(cuid())
+  name            String
+  email           String
+  emailNormalized String        @unique
+  passwordHash    String?
+  role            UserRole      @default(USER)
+  status          AccountStatus @default(ACTIVE)
+
+  suspendedAt     DateTime?
+  suspendedReason String?   @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // One user may have multiple linked authentication providers.
+  accounts AuthAccount[]
+
+  // Database-backed login sessions.
+  sessions Session[]
+
+  // A user may have only one organizer profile.
+  organizerProfile OrganizerProfile? @relation("OrganizerOwner")
+
+  // An admin may review multiple organizer profiles.
+  reviewedOrganizerProfiles OrganizerProfile[] @relation("OrganizerReviewer")
+
+  @@index([role, status])
+  @@index([createdAt])
+}
+
+// Stores Auth.js-compatible provider-account relationships.
+//
+// AuthAccount is used instead of the generic name Account to avoid
+// confusion with EventHub's user account status.
+model AuthAccount {
+  id                String @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+
+  refreshToken String? @db.Text
+  accessToken  String? @db.Text
+  expiresAt    Int?
+  tokenType    String?
+  scope        String?
+  idToken      String? @db.Text
+  sessionState String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+// Stores database-backed authenticated sessions.
+//
+// Actual sign-in, sign-out, and session creation are implemented
+// later in the Auth.js story.
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expires])
+}
+
+// Supports one-time verification/token workflows used by Auth.js.
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@index([expires])
+}
+
+// Stores organizer-specific data separately from the base User.
+//
+// Creating this row does not immediately grant organizer privileges.
+// Approval behavior is implemented in Story 3.2.
+model OrganizerProfile {
+  id          String          @id @default(cuid())
+  userId      String          @unique
+  displayName String
+  description String?         @db.Text
+  status      OrganizerStatus @default(PENDING)
+
+  rejectionReason String?   @db.Text
+  reviewedById    String?
+  reviewedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner User @relation("OrganizerOwner", fields: [userId], references: [id], onDelete: Cascade)
+
+  reviewedBy User? @relation("OrganizerReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([reviewedById])
+}
+
+// Database-managed taxonomy for event forms, search, filters,
+// moderation, and reporting.
+model EventCategory {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique
+  description String? @db.Text
+  isActive    Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+}
