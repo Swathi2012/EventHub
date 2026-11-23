@@ -1,38 +1,43 @@
-/**
- * Safe application error for unexpected database failures.
- *
- * Raw Prisma or MySQL errors may contain table names,
- * constraint names, query information, or connection details.
- * Those details must not be sent directly to browser users.
- */
-export class DatabaseUnavailableError extends Error {
-  readonly code = "DATABASE_UNAVAILABLE";
+﻿import {
+  ApplicationError,
+} from "../errors/application-error";
 
-  constructor() {
-    super("The database operation could not be completed.");
+import {
+  ERROR_CODES,
+} from "../errors/error-codes";
 
-    this.name = "DatabaseUnavailableError";
-  }
-}
+const DATABASE_ERROR_MESSAGE =
+  "The database operation could not be completed.";
 
-/**
- * Executes a database operation and converts unexpected
- * infrastructure failures into a controlled application error.
- */
+export type DatabaseOperationOptions = {
+  operation: string;
+};
+
 export async function withDatabaseErrorHandling<T>(
+  options: DatabaseOperationOptions,
   operation: () => Promise<T>,
 ): Promise<T> {
   try {
     return await operation();
   } catch (error) {
-    /**
-     * Detailed diagnostics remain server-side.
-     *
-     * Story 1.3 will replace this with structured logging
-     * and correlation identifiers.
-     */
-    console.error("EventHub database operation failed:", error);
+    if (
+      error instanceof ApplicationError
+    ) {
+      throw error;
+    }
 
-    throw new DatabaseUnavailableError();
+    const operationError = new Error(
+      `Database operation failed: ${options.operation}`,
+      {
+        cause: error,
+      },
+    );
+
+    throw new ApplicationError({
+      code: ERROR_CODES.INTERNAL_ERROR,
+      message: DATABASE_ERROR_MESSAGE,
+      statusCode: 500,
+      cause: operationError,
+    });
   }
 }

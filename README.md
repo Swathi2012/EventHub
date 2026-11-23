@@ -64,3 +64,47 @@ Format the Prisma schema:
 
 ```bash
 npm run prisma:format
+
+## Error handling and logging
+
+EventHub uses one shared error model for server-side services,
+Server Actions, and Route Handlers.
+
+### Application errors
+
+Expected application failures use `ApplicationError`.
+
+Examples include:
+
+- Authentication required
+- Forbidden operations
+- Missing resources
+- Validation failures
+- Data conflicts
+- Invalid status transitions
+- Unavailable tickets
+- Suspended accounts
+- Rate limiting
+
+An application error contains:
+
+- A stable error code
+- A safe public message
+- An HTTP status code
+- Optional validation field errors
+- An optional internal cause
+
+Internal causes and stack traces must never be returned to the
+browser.
+
+### Action results
+
+Server Actions return a typed success or failure result.
+
+Success result:
+
+```ts
+{
+  ok: true,
+  data: result,
+}
